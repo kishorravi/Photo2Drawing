@@ -15,55 +15,52 @@ os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
 def convert_to_pencil_sketch(input_path, output_path, text):
     # Read the image
-    img = cv2.imread(input_path, cv2.IMREAD_COLOR)
-    
-    # Convert to gray scale
-    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    
-    # Invert the gray image
-    inverted_img = cv2.bitwise_not(gray_img)
-    
-    # Blur the image by gaussian function
-    blurred_img = cv2.GaussianBlur(inverted_img, (21, 21), 0)
-    
+    image = cv2.imread(input_path)
+    # Convert to grayscale
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # Invert the grayscale image
+    inverted_image = 255 - gray_image
+    # Blur the inverted image
+    blurred_image = cv2.GaussianBlur(inverted_image, (21, 21), 0)
     # Invert the blurred image
-    inverted_blur = cv2.bitwise_not(blurred_img)
-    
+    inverted_blurred = 255 - blurred_image
     # Create the pencil sketch image
-    sketch_img = cv2.divide(gray_img, inverted_blur, scale=256.0)
-    
-    # Convert to PIL Image for adding text
-    pil_img = Image.fromarray(sketch_img)
+    sketch_image = cv2.divide(gray_image, inverted_blurred, scale=256.0)
+
+    # Convert to PIL Image to add text
+    pil_img = Image.fromarray(sketch_image)
     draw = ImageDraw.Draw(pil_img)
-    
-    # Adding text
-    font_size = 30
-    font = ImageFont.truetype("arial.ttf", font_size)
-    text_width, text_height = draw.textsize(text, font=font)
-    x, y = pil_img.width - text_width - 10, pil_img.height - text_height - 10
-    draw.text((x, y), text, (255, 255, 255), font=font)
-    
+    font = ImageFont.load_default()  # You can also use a specific font here
+    # Add text
+    draw.text((10, 10), text, (255, 255, 255), font=font)
+
     # Save the final image
     pil_img.save(output_path, "JPEG")
 
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/upload', methods=['POST'])
+@app.route('/', methods=['GET', 'POST'])
 def upload_file():
-    if 'file' not in request.files:
-        return 'No file part'
-    file = request.files['file']
-    if file.filename == '':
-        return 'No selected file'
-    if file:
-        filename = secure_filename(file.filename)
-        input_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        output_path = os.path.join(app.config['OUTPUT_FOLDER'], 'sketch_' + filename)
-        file.save(input_path)
-        convert_to_pencil_sketch(input_path, output_path, "Kishor Ravikumar")
-        return send_file(output_path, as_attachment=True)
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return 'No file part'
+        file = request.files['file']
+        if file.filename == '':
+            return 'No selected file'
+        if file:
+            filename = secure_filename(file.filename)
+            input_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            output_path = os.path.join(app.config['OUTPUT_FOLDER'], 'sketch_' + filename)
+            file.save(input_path)
+            convert_to_pencil_sketch(input_path, output_path, "Kishor Ravikumar")
+            return send_file(output_path, as_attachment=True)
+    return '''
+    <!doctype html>
+    <title>Upload Image</title>
+    <h1>Upload Image</h1>
+    <form method=post enctype=multipart/form-data>
+      <input type=file name=file>
+      <input type=submit value=Upload>
+    </form>
+    '''
 
 if __name__ == '__main__':
     app.run(debug=True)
